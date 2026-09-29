@@ -254,6 +254,7 @@ def read_applications(config):
         if section.lower().startswith("app:"):
             app = {
                 'id' : section[4:],
+                'version' : config.get(section, 'version', fallback=''),
                 'title' : config.get(section, 'title', fallback='Unknown'),
                 'subtitle' : config.get(section, 'subtitle', fallback=''),
                 'platform' : config.get(section, 'platform', fallback=''),
