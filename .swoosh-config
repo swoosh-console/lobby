@@ -1,0 +1,6 @@
+# Default path ~/.swoosh-config
+[SWOOSH]
+state_file=~/.swoosh-state
+
+[INCLUDE]
+~/.swoosh-config.d
