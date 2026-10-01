@@ -42,20 +42,35 @@ export default {
         window.location.reload(true);
       });
     },
+    upload() {
+      let self = this;
+      let dropzone = new Dropzone("div#uploader", { url: "/upload", binaryBody: true})
+      dropzone.on("success", function(files, response) {
+        self.loader='Waiting for deploy confirmation.';
+        let id = response.id;
+        let title = response.title + " " + response.subtitle;
+        let deploy = confirm("Do you want to deploy the application " + title + "?");
+        if (deploy) {
+          axios.post('/deploy/' + id).then((response) => {
+            self.showMessage('Application installed!',4000, () => self.refresh());
+          }).catch((error) => {
+            self.showMessage('Failed to deploy application.\nContact application distributer for more information.',4000);
+          });
+        }
+      });
+      dropzone.on("error", function(files, response) {
+        self.showMessage('Failed to install application.\nContact application distributer for more information.',4000);
+      });
+      dropzone.hiddenFileInput.click();
+      self.loader='Installing application. Please wait...';
+    },
     update() {
       let self = this;
       self.loader='Updating system. Please wait...';
       axios.post('/update').then((response) => {
-        self.loader='Update complete! Reloading system...';
-        setTimeout(() => {
-          self.loader='';
-          window.location.reload(true);
-        },4000); 
+        self.showMessage('Update complete! Reloading system...',4000, () => window.location.reload(true));
       }).catch((error) => {
-        self.loader='Failed to update system. Try again later.';
-        setTimeout(() => {
-          self.loader='';
-        },4000);
+        self.showMessage('Failed to update system. Try again later.',4000);
       });
     },
     shutdown() {
@@ -107,6 +122,16 @@ export default {
         
       });
     },
+    showMessage(text, time, callback) {
+      let self = this;
+      self.loader=text;
+      setTimeout(() => {
+        self.loader='';
+        if (callback) {
+          callback();
+        }
+      },time);
+    },
     onSelect(app) {
       this.app = app;
       console.log(app.title);
@@ -136,6 +161,9 @@ export default {
       switch(action) {
         case 'refresh':
           this.refresh();
+          break;
+        case 'upload':
+          this.upload();
           break;
         case 'update':
           this.update();
@@ -177,4 +205,5 @@ export default {
   <UserInfo v-bind:info="info"></UserInfo>
   <Loader v-if="loader" v-bind:info="loader"></Loader>
   <Footer v-bind:currentVersion="currentVersion"></Footer>
+  <div style="display: none" id="uploader"></div>
 </template>

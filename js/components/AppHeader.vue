@@ -4,6 +4,10 @@ const buttons = [{
   icon: 'fa-solid fa-arrows-rotate',
   action: 'refresh'
 },{
+  text: 'Add App',
+  icon: 'fa-solid fa-folder-plus',
+  action: 'upload'
+},{
   text: 'Update',
   icon: 'fa-solid fa-download',
   action: 'update'

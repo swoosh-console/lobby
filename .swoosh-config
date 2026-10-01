@@ -1,6 +1,9 @@
 # Default path ~/.swoosh-config
 [SWOOSH]
 state_file=~/.swoosh-state
+upload_dir=~/.swoosh-upload
+resources_dir=~/.swoosh-resources
+deploy_dir=~/.swoosh-config.d
 
 [INCLUDE]
 ~/.swoosh-config.d

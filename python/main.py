@@ -11,6 +11,7 @@ import mimetypes
 import os
 import signal
 import subprocess
+import zipfile
 
 logger = logging.getLogger(__name__)
 
@@ -197,13 +198,13 @@ class HTTPHandler(SimpleHTTPRequestHandler):
     def get_state(self, parsed_path):
         global script_path
         r1 = subprocess.run(['git','log','-n','1','HEAD','--format=%cI'], 
-            stdout=subprocess.PIPE, cwd=Path(script_path).parent.parent.parent.absolute())
+            stdout=subprocess.PIPE, cwd=Path(script_path).parent.parent.absolute())
         local_version = r1.stdout.decode('utf-8').strip()
         remote_version = None
         try:
-            subprocess.run(['git','-c','http.sslVerify=false','fetch'])
+            subprocess.run(['git','fetch'])
             r2 = subprocess.run(['git','log','-n','1','origin/main','--format=%cI'], 
-                stdout=subprocess.PIPE, cwd=Path(script_path).parent.parent.parent.absolute())
+                stdout=subprocess.PIPE, cwd=Path(script_path).parent.parent.absolute())
             remote_version = r2.stdout.decode('utf-8').strip()
         except Exception as e:
             logger.error("Unable to fetch remote version: %s", str(e))
@@ -212,10 +213,46 @@ class HTTPHandler(SimpleHTTPRequestHandler):
     @method("/update", "POST")
     def update(self, parsed_path):
         global script_path
-        result = subprocess.run(['git','-c','http.sslVerify=false','pull'], 
-            stdout=subprocess.PIPE, cwd=Path(script_path).parent.parent.parent.absolute())
+        result = subprocess.run(['git','pull'], 
+            stdout=subprocess.PIPE, cwd=Path(script_path).parent.parent.absolute())
         exit_code = result.returncode
         self.end_with_code(200 if exit_code == 0 else 500)
+    
+    @method("/upload", "POST")
+    def upload(self, parsed_path):
+        global upload_dir
+        file_length = int(self.headers['Content-Length'])
+        app_zip = os.path.join(upload_dir, "app.zip")
+        with open(app_zip, 'wb') as app_file:
+            app_file.write(self.rfile.read(file_length))
+        app_ini = os.path.join(upload_dir, "app.ini")
+        with zipfile.ZipFile(app_zip) as z:
+            with open(app_ini, 'wb') as f:
+                f.write(z.read('app.ini'))
+        app_config = configparser.ConfigParser(allow_no_value=True)
+        app_config.read(app_ini)
+        app = {}
+        for section in app_config.sections():
+            app['id'] = section[4:]
+            app['version'] = app_config.get(section, 'version', fallback='')
+            app['title'] = app_config.get(section, 'title')
+            app['subtitle'] = app_config.get(section, 'subtitle', fallback='')
+        self.end_with_json(app)
+
+    @method("/deploy", "POST")
+    def upload(self, parsed_path):
+        global upload_dir
+        global resources_dir
+        global deploy_dir
+        global state
+        app_id = parsed_path.path.split('/')[2]
+        app_zip = os.path.join(upload_dir, "app.zip")
+        target_dir = os.path.join(resources_dir, app_id)
+        result = subprocess.run(['unzip', '-o', app_zip,'-d',target_dir], stdout=subprocess.PIPE)
+        exit_code = result.returncode
+        os.symlink(os.path.join(target_dir, "app.ini"), os.path.join(deploy_dir, app_id))
+        state['last_app'] = app_id
+        self.end_with_code(200)
 
 # Define custom HTTPServer
 class HTTPServer(BaseHTTPServer):
@@ -277,12 +314,21 @@ parser.add_argument('-c', metavar='path', type=str, help='Configuration file pat
     default=os.path.join(Path.home(),'.swoosh-config'))
 parser.add_argument('-s', metavar='path', type=str, help='State file path', 
     default=os.path.join(Path.home(),'.swoosh-state'))
+parser.add_argument('-u', metavar='path', type=str, help='Upload directory', 
+    default=os.path.join(Path.home(),'.swoosh-upload'))
+parser.add_argument('-r', metavar='path', type=str, help='Resources directory', 
+    default=os.path.join(Path.home(),'.swoosh-resources'))
+parser.add_argument('-d', metavar='path', type=str, help='Deploy directory', 
+    default=os.path.join(Path.home(),'.swoosh-config.d'))
 parser.add_argument('-l', metavar='path', type=str, help='Log file', default=None)
 parser.add_argument('-v', metavar='log-level', type=str, help='Logging level (e.g. INFO)', 
     default="INFO")
 args = parser.parse_args()
 config_file = args.c
 state_file = args.s
+upload_dir = args.u
+resources_dir = args.r
+deploy_dir = args.d
 
 # Load and read configuration file
 config = read_configuration(config_file)
@@ -292,9 +338,12 @@ log_level = logging.getLevelName(config.get('SWOOSH', 'log_level', fallback=args
 log_file = config.get('SWOOSH', 'log_file', fallback=args.l)
 http_port = int(config.get('SWOOSH', 'http_port', fallback='8000'))
 state_file = os.path.expanduser(config.get('SWOOSH', 'state_file', fallback=state_file))
+upload_dir = os.path.expanduser(config.get('SWOOSH', 'upload_dir', fallback=upload_dir))
+resources_dir = os.path.expanduser(config.get('SWOOSH', 'resources_dir', fallback=resources_dir))
+deploy_dir = os.path.expanduser(config.get('SWOOSH', 'deploy_dir', fallback=deploy_dir))
 http_port = int(config.get('SWOOSH', 'http_port', fallback='8000'))
 web_dir = os.path.expanduser(config.get('SWOOSH', 'web_dir', fallback=os.path.join(os.path.dirname(__file__), '../js')))
-browser_cmd = config.get('SWOOSH', 'web_dir', fallback=f"firefox http://127.0.0.1:{http_port}")
+browser_cmd = config.get('SWOOSH', 'browser_cmd', fallback=f"firefox http://127.0.0.1:{http_port}")
 apps = read_applications(config)
 
 # Set up logging

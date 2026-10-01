@@ -32,5 +32,6 @@ export default {
     font-size: 5vh;
     color: white;
     text-shadow: 1px 1px black;
+    white-space: pre-wrap;
 }
 </style>
