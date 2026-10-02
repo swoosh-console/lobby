@@ -46,17 +46,6 @@ class HTTPHandler(SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         logger.info("%s", format % args)
 
-    def do_REQUEST(self, method, fallback_method):
-        try:
-            parsed_path = urlparse(self.path)
-            path = parsed_path.path
-            selected_methods = list(filter(lambda m : m["method"]==method and path.startswith(m["path"]), methods))
-            if len(selected_methods) > 0:
-                selected_methods[0]["function"](self, parsed_path)
-            else:
-                fallback_method()
-        except Exception as e:
-            logger.error(e)
 
     @override
     def do_GET(self):
@@ -72,26 +61,33 @@ class HTTPHandler(SimpleHTTPRequestHandler):
             self.send_header("Cache-control", "no-store")
         super().end_headers()
 
+    def do_REQUEST(self, method, fallback_method):
+        try:
+            parsed_path = urlparse(self.path)
+            path = parsed_path.path
+            selected_methods = list(filter(lambda m : m["method"]==method and path.startswith(m["path"]), methods))
+            if len(selected_methods) > 0:
+                selected_methods[0]["function"](self, parsed_path)
+            else:
+                fallback_method()
+        except Exception as e:
+            logger.error(e)
+            self.end_with_code(500)
+
     def get_app(self, parsed_path):
-        global apps
         parts = parsed_path.path.split('/')
-        if len(parts) < 3:
-            return None
-        return list(filter(lambda a : a['id'] == parts[2], apps))[0]
+        return None if len(parts) < 3 else next(filter(lambda a : a['id'] == parts[2], apps))
     
     def send_app_file(self, parsed_path, file, validator):
         app = self.get_app(parsed_path)
-        if app is None:
-            self.end_with_code(404)
-            return
+        if not app:
+            return self.end_with_code(404)
         file_path = app.get(file)
-        if file_path is None or file_path == '':
-            self.end_with_code(404)
-            return
+        if not file_path:
+            return self.end_with_code(404)
         if not validator(file_path):
-            self.end_with_code(500)
-            return 
-        extension = os.path.splitext(file_path)[1]
+            return self.end_with_code(500)
+        _, extension = os.path.splitext(file_path)
         mime = mimetypes.types_map[extension]
         try:
             with open(os.path.expanduser(file_path), 'rb') as f:
@@ -104,7 +100,6 @@ class HTTPHandler(SimpleHTTPRequestHandler):
 
     @method("/apps")
     def apps(self, parsed_path):
-        global apps
         self.end_with_json(apps)
 
     @method("/covers")
@@ -125,13 +120,11 @@ class HTTPHandler(SimpleHTTPRequestHandler):
 
     def run_app_command(self, parsed_path, command):
         app = self.get_app(parsed_path)
-        if app is None:
-            self.end_with_code(404)
-            return
+        if not app:
+            return self.end_with_code(404)
         shell_cmd = app.get(command)
-        if shell_cmd is None or shell_cmd == '':
-            self.end_with_code(404)
-            return
+        if not shell_cmd:
+            return self.end_with_code(404)
         global app_handle
         app_handle = subprocess.Popen(shell_cmd, shell=True, preexec_fn=os.setsid)
         global current_app
@@ -151,7 +144,6 @@ class HTTPHandler(SimpleHTTPRequestHandler):
 
     @method("/shutdown", "POST")
     def shutdown(self, parsed_path):
-        global on_exit
         logger.info(f"Running pre-shutdown command: {on_exit}")
         if on_exit:
             subprocess.call(on_exit, shell=True)
@@ -160,7 +152,6 @@ class HTTPHandler(SimpleHTTPRequestHandler):
 
     @method("/refresh", "POST")
     def refresh(self, parsed_path):
-        global config_file
         global apps
         config = read_configuration(config_file)
         apps = read_applications(config) 
@@ -169,12 +160,10 @@ class HTTPHandler(SimpleHTTPRequestHandler):
     @method("/exit", "POST")
     def exit_app(self, parsed_path):
         app = self.get_app(parsed_path)
-        global current_app
-        if app is None:
+        if not app:
             app = current_app
         shell_cmd = app.get('kill_default')
-        if shell_cmd is None or shell_cmd == '':
-            global app_handle
+        if not shell_cmd:
             os.killpg(os.getpgid(app_handle.pid), signal.SIGTERM)
         else:
             subprocess.Popen(shell_cmd, shell=True)
@@ -182,21 +171,19 @@ class HTTPHandler(SimpleHTTPRequestHandler):
 
     @method("/state")
     def get_state(self, parsed_path):
-        global state
         self.end_with_json(state)
 
     @method("/state", "POST")
     def set_state(self, parsed_path):
-        global state
         content_len = int(self.headers.get('Content-Length'))
         post_body = self.rfile.read(content_len)
+        global state
         state = json.loads(post_body) # Verify content format
         save_state()
         self.end_with_code(200)
 
     @method("/version")
     def get_state(self, parsed_path):
-        global script_path
         r1 = subprocess.run(['git','log','-n','1','HEAD','--format=%cI'], 
             stdout=subprocess.PIPE, cwd=Path(script_path).parent.parent.absolute())
         local_version = r1.stdout.decode('utf-8').strip()
@@ -212,18 +199,15 @@ class HTTPHandler(SimpleHTTPRequestHandler):
 
     @method("/update", "POST")
     def update(self, parsed_path):
-        global script_path
         result = subprocess.run(['git','pull'], 
             stdout=subprocess.PIPE, cwd=Path(script_path).parent.parent.absolute())
-        exit_code = result.returncode
-        self.end_with_code(200 if exit_code == 0 else 500)
+        self.end_with_code(200 if result.returncode == 0 else 500)
     
     @method("/upload", "POST")
     def upload(self, parsed_path):
-        global upload_dir
-        file_length = int(self.headers['Content-Length'])
         app_zip = os.path.join(upload_dir, "app.zip")
         with open(app_zip, 'wb') as app_file:
+            file_length = int(self.headers['Content-Length'])
             app_file.write(self.rfile.read(file_length))
         app_ini = os.path.join(upload_dir, "app.ini")
         with zipfile.ZipFile(app_zip) as z:
@@ -241,16 +225,14 @@ class HTTPHandler(SimpleHTTPRequestHandler):
 
     @method("/deploy", "POST")
     def upload(self, parsed_path):
-        global upload_dir
-        global resources_dir
-        global deploy_dir
-        global state
         app_id = parsed_path.path.split('/')[2]
         app_zip = os.path.join(upload_dir, "app.zip")
         target_dir = os.path.join(resources_dir, app_id)
-        result = subprocess.run(['unzip', '-o', app_zip,'-d',target_dir], stdout=subprocess.PIPE)
-        exit_code = result.returncode
-        os.symlink(os.path.join(target_dir, "app.ini"), os.path.join(deploy_dir, app_id))
+        app_ini = os.path.join(target_dir, "app.ini")
+        assert subprocess.run(['unzip', '-o', app_zip,'-d',target_dir], stdout=subprocess.PIPE).returncode == 0
+        assert subprocess.run(['sed', '-i', '-e', f"s|$appdir|{target_dir}|g", app_ini], stdout=subprocess.PIPE).returncode == 0
+        os.symlink(app_ini, os.path.join(deploy_dir, app_id))
+        global state
         state['last_app'] = app_id
         self.end_with_code(200)
 
@@ -262,8 +244,6 @@ class HTTPServer(BaseHTTPServer):
         BaseHTTPServer.__init__(self, server_address, RequestHandlerClass) 
 
 def save_state():
-    global state
-    global state_file
     with open(state_file, 'wb') as sf:
         sf.write(json.dumps(state).encode("utf-8"))
 

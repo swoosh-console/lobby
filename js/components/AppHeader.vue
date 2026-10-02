@@ -1,21 +1,23 @@
 <script>
-const buttons = [{
+const mouse_buttons = [{
+  text: 'Add App',
+  icon: 'fa-solid fa-box-open',
+  action: 'upload'
+}, {
+  text: 'Settings',
+  icon: 'fa-solid fa-gears',
+  action: 'settings'
+}]
+
+const gamepad_buttons = [{
   text: 'Refresh',
   icon: 'fa-solid fa-arrows-rotate',
   action: 'refresh'
-},{
-  text: 'Add App',
-  icon: 'fa-solid fa-folder-plus',
-  action: 'upload'
 },{
   text: 'Update',
   icon: 'fa-solid fa-download',
   action: 'update'
 },{
-  text: 'Settings',
-  icon: 'fa-solid fa-gears',
-  action: 'settings'
-}, {
   text: 'Shutdown',
   icon: 'fa-solid fa-power-off',
   action: 'shutdown'
@@ -26,32 +28,38 @@ export default {
   emits: ['onAction'],
   data() {
     return {
-      hover : Array.apply(null, {length: buttons.length}).map(() => false),
+      hover : null,
       currentIndex : -1,
-      buttons : buttons,
       headerDisabled : true
     }
   },
   methods: {
-    getAvailableButtons() {
-      return buttons.filter(b => b.text != "Update" || this.updateAvailable);
+    getAvailableMouseButtons() {
+      return mouse_buttons;
+    },
+    getAvailableGamepadButtons() {
+      return gamepad_buttons.filter(b => b.text != "Update" || this.updateAvailable);
     },
     navigateLeft() {
         this.currentIndex = Math.max(0, this.currentIndex - 1)
     },
     navigateRight() {
-        this.currentIndex = Math.min(buttons.length - 1, this.currentIndex + 1)
+        this.currentIndex = Math.min(this.getAvailableGamepadButtons().length - 1, this.currentIndex + 1)
     },
     navigateUp() {
       this.headerDisabled = false;
-      this.currentIndex = this.getAvailableButtons().findIndex(b => b.action === "settings");
+      this.currentIndex = 0; //this.getAvailableButtons().findIndex(b => b.action === "settings");
     },
     navigateDown() {
       this.headerDisabled = true;
       this.currentIndex = -1;
     },
-    runAction(buttonIndex) {
-      let action = this.getAvailableButtons()[buttonIndex].action;
+    invokeMouseButtonAction(buttonIndex) {
+      let action = this.getAvailableMouseButtons()[buttonIndex].action;
+      this.$emit('onAction', action);
+    },
+    invokeGamepadButtonAction(buttonIndex) {
+      let action = this.getAvailableGamepadButtons()[buttonIndex].action;
       this.$emit('onAction', action);
     },
     onKeydown(event) {
@@ -62,7 +70,7 @@ export default {
         return;
       }
       if (event.key == "Enter") {
-        this.runAction(this.currentIndex);
+        this.invokeGamepadButtonAction(this.currentIndex);
       } else if (event.key == "ArrowLeft") {
         this.navigateLeft();
       } else if (event.key == "ArrowRight") {
@@ -133,8 +141,11 @@ export default {
     }
   },
   computed: {
-    availableButtons() {
-      return this.getAvailableButtons()
+    availableMouseButtons() {
+      return this.getAvailableMouseButtons()
+    },
+    availableGamepadButtons() {
+      return this.getAvailableGamepadButtons()
     }
   },
   mounted() {
@@ -151,14 +162,24 @@ export default {
 <template>
   <div class="header">
     <div class="logo"><img src="images/favicon.png" style="height: 3.5vh;">SWOOSH</div>
-    <div v-for="(b, index) in availableButtons" class="button-parent">
+    <div v-for="(b, index) in availableMouseButtons" class="button-parent">
       <div class="button active-button" 
-        @mouseenter="hover[index]=isMouseEnabled()"
-        @mouseleave="hover[index]=false"
-        @click="runAction(index)">
-        <i :class="{ [b.icon] : true, 'fa-bounce active-icon' : index == currentIndex || hover[index]}"></i>
+        @mouseenter="hover=isMouseEnabled() ? b['action'] : null"
+        @mouseleave="hover=null"
+        @click="invokeMouseButtonAction(index)">
+        <i :class="{ [b.icon] : true, 'fa-bounce active-icon' : hover==b['action']}"></i>
       </div>
-      <p v-if="index == currentIndex" class="button-info">{{ b.text }}</p>
+      <p v-if="hover==b['action']" class="button-info">{{ b.text }}</p>
+    </div>
+    <div class="button-parent-separator" />
+    <div v-for="(b, index) in availableGamepadButtons" class="button-parent">
+      <div class="button active-button" 
+        @mouseenter="hover=isMouseEnabled() ? b['action'] : null"
+        @mouseleave="hover=null"
+        @click="invokeGamepadButtonAction(index)">
+        <i :class="{ [b.icon] : true, 'fa-bounce active-icon' : index == currentIndex || hover==b['action']}"></i>
+      </div>
+      <p v-if="index == currentIndex || hover==b['action']" class="button-info">{{ b.text }}</p>
     </div>
   </div>
 </template>
@@ -178,7 +199,7 @@ export default {
   background-color: rgb(80, 80, 80);
   display: flex;
   justify-content: center;
-  z-index: 2;
+  z-index: 4;
 }
 
 .logo {
@@ -189,13 +210,21 @@ export default {
   left: 0;
   top: 0;
   height: 4vh;
-  z-index: 3;
+  z-index: 5;
   font-family: 'retro';
 }
 
 .button-parent {
   margin-left: 16px;
   margin-right: 16px;
+  margin-top: 8px;
+  height: 5.75vh;
+  text-align: center;
+}
+
+.button-parent-separator {
+  width: 2px;
+  background-color: rgb(70, 68, 73);
   margin-top: 8px;
   height: 5.75vh;
   text-align: center;

@@ -255,7 +255,7 @@ const getAppSummary = (app) => {
       <p style="text-align: center; position: absolute; top: 20px;">
         <h1>{{ app.title }}</h1>
         <h2>{{ app.subtitle }}</h2>
-        <img class="cover" :class="{cover_start_animation:appPressed==app.index}" :src="app.cover" alt="image" :style="[app.index == appPressed || (carouselDisabled && app.index == currentSlide) ? {opacity: 0.5} : {}]" /><br>
+        <img @dblclick="runDefault" class="cover" :class="{cover_start_animation:appPressed==app.index}" :src="app.cover" alt="image" :style="[app.index == appPressed || (carouselDisabled && app.index == currentSlide) ? {opacity: 0.5} : {}]" /><br>
         <div class="reflection-perspective" v-if="app.index == currentSlide">
           <img class="reflection" :src="app.cover" alt="image" />
         </div>

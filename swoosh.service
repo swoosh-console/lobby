@@ -1,0 +1,12 @@
+[Unit]
+Description=Swoosh Lobby
+#After=network.target
+
+[Service]
+Type=simple
+User=%i
+ExecStart=/usr/bin/python3 /home/%i/swoosh/python/main.py
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
