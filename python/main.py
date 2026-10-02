@@ -323,7 +323,7 @@ resources_dir = os.path.expanduser(config.get('SWOOSH', 'resources_dir', fallbac
 deploy_dir = os.path.expanduser(config.get('SWOOSH', 'deploy_dir', fallback=deploy_dir))
 http_port = int(config.get('SWOOSH', 'http_port', fallback='8000'))
 web_dir = os.path.expanduser(config.get('SWOOSH', 'web_dir', fallback=os.path.join(os.path.dirname(__file__), '../js')))
-browser_cmd = config.get('SWOOSH', 'browser_cmd', fallback=f"firefox http://127.0.0.1:{http_port}")
+browser_cmd = config.get('SWOOSH', 'browser_cmd', fallback=f"firefox --kiosk http://127.0.0.1:{http_port}")
 apps = read_applications(config)
 
 # Set up logging

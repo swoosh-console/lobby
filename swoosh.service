@@ -1,12 +1,16 @@
+#Place in .local/share/systemd/user/swoosh.service 
+#Enable with 'systemctl --user enable swoosh.service'
 [Unit]
 Description=Swoosh Lobby
 #After=network.target
 
 [Service]
 Type=simple
-User=%i
-ExecStart=/usr/bin/python3 /home/%i/swoosh/python/main.py
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=DISPLAY=:0
+ExecStart=/usr/bin/python3 %h/swoosh/python/main.py
 Restart=on-failure
 
 [Install]
-WantedBy=default.target
+#WantedBy=default.target
+WantedBy=graphical-session.target
