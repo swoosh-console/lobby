@@ -17,6 +17,7 @@ export default {
     return {
       audio: new Audio(),
       app: null,
+      dropzone: null,
       info: 'No Gamepad was Detected. Connect and Press any Button.',
       loader: '',
       currentVersion: 'Fetching version...',
@@ -43,26 +44,8 @@ export default {
       });
     },
     upload() {
-      let self = this;
-      let dropzone = new Dropzone("div#uploader", { url: "/upload", binaryBody: true})
-      dropzone.on("success", function(files, response) {
-        self.loader='Waiting for deploy confirmation.';
-        let id = response.id;
-        let title = response.title + " " + response.subtitle;
-        let deploy = confirm("Do you want to deploy the application " + title + "?");
-        if (deploy) {
-          axios.post('/deploy/' + id).then((response) => {
-            self.showMessage('Application installed!',4000, () => self.refresh());
-          }).catch((error) => {
-            self.showMessage('Failed to deploy application.\nContact application distributer for more information.',4000);
-          });
-        }
-      });
-      dropzone.on("error", function(files, response) {
-        self.showMessage('Failed to install application.\nContact application distributer for more information.',4000);
-      });
-      dropzone.hiddenFileInput.click();
-      self.loader='Installing application. Please wait...';
+      this.dropzone.hiddenFileInput.click();
+      this.loader='Installing application. Please wait...';
     },
     update() {
       let self = this;
@@ -191,6 +174,25 @@ export default {
     window.addEventListener("gamepadconnected", this.onConnectGamepad);
     window.addEventListener("gamepaddisconnected", this.onDisconnectGamepad);
     this.fetch_version();
+    let self = this;
+    this.dropzone = new Dropzone("div#uploader", { url: "/upload", binaryBody: true, maxFilesize: 50000})
+    this.dropzone.on("success", function(files, response) {
+      self.loader='Waiting for deploy confirmation.';
+      let id = response.id;
+      let title = response.title + " " + response.subtitle;
+      let deploy = confirm("Do you want to deploy the application " + title + "?");
+      if (deploy) {
+        self.loader='Deploying application...';
+        axios.post('/deploy/' + id).then((response) => {
+          self.showMessage('Application installed!',4000, () => self.refresh());
+        }).catch((error) => {
+          self.showMessage('Failed to deploy application.\nContact application distributer for more information.',4000);
+        });
+      }
+    });
+    this.dropzone.on("error", function(files, response) {
+      self.showMessage('Failed to install application.\nContact application distributer for more information.',4000);
+    });
   },
   unmounted() {
     window.removeEventListener("gamepadconnected", this.onConnectGamepad);

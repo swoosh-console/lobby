@@ -203,6 +203,10 @@ const getPlatformIcon = (platform) => {
       return "images/ps2.png"
     case "snes":
       return "images/snes.png"
+    case "wii":
+      return "images/wii.webp"
+    case "wiiu":
+      return "images/wiiu.png"
     default:
       return "images/unknown.png"
   }
@@ -226,6 +230,10 @@ const getPlatformName = (platform) => {
       return "Playstation 3";
     case "snes":
       return "Super Nintendo"
+    case "wii":
+      return "Wii"
+    case "wiiu":
+      return "Wii U"
     default:
       return "unknown platform"
   }

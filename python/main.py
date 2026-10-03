@@ -11,6 +11,8 @@ import mimetypes
 import os
 import signal
 import subprocess
+import threading
+import time
 import zipfile
 
 logger = logging.getLogger(__name__)
@@ -324,6 +326,7 @@ deploy_dir = os.path.expanduser(config.get('SWOOSH', 'deploy_dir', fallback=depl
 http_port = int(config.get('SWOOSH', 'http_port', fallback='8000'))
 web_dir = os.path.expanduser(config.get('SWOOSH', 'web_dir', fallback=os.path.join(os.path.dirname(__file__), '../js')))
 browser_cmd = config.get('SWOOSH', 'browser_cmd', fallback=f"firefox --kiosk http://127.0.0.1:{http_port}")
+browser_delay = int(config.get('SWOOSH', 'browser_delay', fallback='500'))
 apps = read_applications(config)
 
 # Set up logging
@@ -347,6 +350,9 @@ logger.debug('Initializing MIME types')
 mimetypes.init()
 logger.info('Starting HTTP server')
 httpd = HTTPServer(web_dir, ("", http_port))
+server_thread = threading.Thread(target=lambda : httpd.serve_forever())
+server_thread.start()
+time.sleep(browser_delay / 1000)
 if browser_cmd != "":
     subprocess.Popen(browser_cmd, shell=True)
-httpd.serve_forever()
+

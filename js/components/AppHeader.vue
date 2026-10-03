@@ -129,7 +129,7 @@ export default {
             newButtonState = button.pressed ? 1 : newButtonState;
           });
           if (newButtonState == 1 && gamepadState.buttonState == 0 && !self.headerDisabled) {
-            self.runAction();
+            self.invokeGamepadButtonAction(self.currentIndex);
           }
           gamepadState.buttonState = newButtonState;
         }
